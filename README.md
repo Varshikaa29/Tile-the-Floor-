@@ -1,5 +1,3 @@
-# Tile-the-Floor-
-An interactive tessellation simulator proving the mathematical constraints of regular polygons in a 2D plane.
 # Tile the Floor
 
 A visual simulation demonstrating the principles of Euclidean tessellation and regular tiling constraints.
