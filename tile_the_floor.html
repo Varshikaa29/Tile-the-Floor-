@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tile the Floor — Varshika Jain</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f7f4; color: #1a1a1a; padding: 24px 16px; }
+.container { max-width: 740px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #666; margin-bottom: 20px; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 99px; background: #FAEEDA; color: #633806; font-weight: 500; margin-left: 8px; vertical-align: middle; }
+.shape-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+button { font-size: 13px; padding: 7px 16px; border-radius: 8px; border: 1px solid #d0cdc5; background: #fff; color: #333; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+button:hover { background: #f0ede8; }
+button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.canvas-wrap { background: #fff; border: 1px solid #e0ddd5; border-radius: 12px; padding: 12px; margin-bottom: 16px; display: flex; justify-content: center; }
+canvas { border-radius: 6px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.info-card { background: #fff; border: 1px solid #e0ddd5; border-radius: 10px; padding: 12px 14px; }
+.info-card .lbl { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.info-card .val { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+.result-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
+.result-bar.tiles { background: #E1F5EE; color: #085041; }
+.result-bar.gaps  { background: #FAECE7; color: #712B13; }
+.angle-display { font-size: 28px; font-weight: 700; color: #4A5C30; text-align: center; margin: 8px 0; }
+.angle-label { font-size: 11px; color: #888; text-align: center; }
+.footer { font-size: 12px; color: #999; text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Tile the Floor <span class="badge">Portfolio Project</span></h1>
+  <p class="sub">Pick a shape and see if it can tile a flat surface with no gaps. Discover which shapes tessellate and why. Made by Varshika Jain · CCL Portfolio</p>
+
+  <div class="shape-row">
+    <span style="font-size:13px;color:#555;font-weight:500;">Pick a shape</span>
+    <button id="b0" class="active" onclick="setShape(0)">Equilateral Triangle</button>
+    <button id="b1" onclick="setShape(1)">Square</button>
+    <button id="b2" onclick="setShape(2)">Regular Pentagon</button>
+    <button id="b3" onclick="setShape(3)">Regular Hexagon</button>
+    <button id="b4" onclick="setShape(4)">Octagon</button>
+  </div>
+
+  <div id="result-bar" class="result-bar tiles">✓ Triangles tessellate perfectly — no gaps!</div>
+
+  <div class="canvas-wrap">
+    <canvas id="c" width="680" height="320"></canvas>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="lbl">Interior Angle</div>
+      <div class="angle-display" id="angle-val">60°</div>
+      <div class="angle-label">per corner of this shape</div>
+    </div>
+    <div class="info-card">
+      <div class="lbl">Angles at each vertex</div>
+      <div class="angle-display" id="vertex-val">6 × 60° = 360°</div>
+      <div class="angle-label" id="vertex-label">Adds up to exactly 360° — tessellates!</div>
+    </div>
+    <div class="info-card">
+      <div class="lbl">Does it tessellate?</div>
+      <div class="val" id="info-tess">Yes — triangles tile perfectly with no gaps</div>
+    </div>
+    <div class="info-card">
+      <div class="lbl">The rule</div>
+      <div class="val">Interior angles at every meeting point must sum to exactly 360°</div>
+    </div>
+  </div>
+
+  <div class="footer">Tile the Floor · Varshika Jain · BS Data Science, IIT Madras · CCL Portfolio</div>
+</div>
+
+<script>
+const SHAPES = [
+  { name: 'Equilateral Triangle', sides: 3,  angle: 60,  tessellates: true,  meet: 6, color: '#534AB7', light: '#EEEDFE', msg: 'Triangles tessellate perfectly — no gaps!' },
+  { name: 'Square',               sides: 4,  angle: 90,  tessellates: true,  meet: 4, color: '#0F6E56', light: '#E1F5EE', msg: 'Squares tessellate perfectly — no gaps!' },
+  { name: 'Regular Pentagon',     sides: 5,  angle: 108, tessellates: false, meet: 0, color: '#993C1D', light: '#FAECE7', msg: 'Pentagons cannot tessellate — the angles leave gaps!' },
+  { name: 'Regular Hexagon',      sides: 6,  angle: 120, tessellates: true,  meet: 3, color: '#854F0B', light: '#FAEEDA', msg: 'Hexagons tessellate perfectly — like a honeycomb!' },
+  { name: 'Octagon',              sides: 8,  angle: 135, tessellates: false, meet: 0, color: '#185FA5', light: '#E8F0FA', msg: 'Octagons cannot fully tessellate — they leave square gaps!' },
+];
+
+let cur = 0;
+
+function polygon(cx, cy, n, r, rotation) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rotation;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return pts;
+}
+
+function drawPoly(ctx, pts, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+}
+
+function drawTessellation(sh) {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 680, 320);
+
+  const W = 680, H = 320;
+  const col = sh.color, light = sh.light;
+
+  if (sh.sides === 3) {
+    const s = 52;
+    const h = s * Math.sqrt(3) / 2;
+    for (let row = -1; row < 8; row++) {
+      for (let col2 = -1; col2 < 18; col2++) {
+        const x = col2 * s + (row % 2) * (s / 2);
+        const y = row * h;
+        const up = [[x, y + h], [x + s, y + h], [x + s/2, y]];
+        const dn = [[x + s/2, y], [x + s, y + h], [x + s*1.5, y]];
+        drawPoly(ctx, up, light, col);
+        if (x + s * 1.5 < W + s) drawPoly(ctx, dn, light, col);
+      }
+    }
+  } else if (sh.sides === 4) {
+    const s = 48;
+    for (let r = -1; r < 8; r++) for (let c2 = -1; c2 < 16; c2++)
+      drawPoly(ctx, [[c2*s,r*s],[c2*s+s,r*s],[c2*s+s,r*s+s],[c2*s,r*s+s]], light, col);
+  } else if (sh.sides === 5) {
+    // show attempted tiling with visible gaps
+    const r = 38;
+    const positions = [];
+    for (let row = 0; row < 4; row++)
+      for (let c2 = 0; c2 < 6; c2++)
+        positions.push([c2 * 95 + 48 + (row%2)*47, row * 88 + 50]);
+    positions.forEach(([cx, cy]) => {
+      const pts = polygon(cx, cy, 5, r, -Math.PI/2);
+      drawPoly(ctx, pts, light, col);
+    });
+    ctx.font = 'bold 13px Segoe UI, Arial';
+    ctx.fillStyle = '#993C1D';
+    ctx.textAlign = 'center';
+    ctx.fillText('Gaps appear — pentagons cannot tile a flat surface', W/2, H - 14);
+  } else if (sh.sides === 6) {
+    const r = 36;
+    const w = r * 2, h = r * Math.sqrt(3);
+    for (let row = -1; row < 6; row++) {
+      for (let c2 = -1; c2 < 10; c2++) {
+        const cx = c2 * w * 0.75 + r;
+        const cy = row * h + (c2 % 2 === 0 ? 0 : h/2);
+        drawPoly(ctx, polygon(cx, cy, 6, r, 0), light, col);
+      }
+    }
+  } else if (sh.sides === 8) {
+    const r = 34;
+    const s = r * Math.sqrt(2 - Math.sqrt(2));
+    const step = r * Math.sqrt(2);
+    for (let row = -1; row < 5; row++) {
+      for (let c2 = -1; c2 < 7; c2++) {
+        const cx = c2 * (step + s) + step/2 + s/2;
+        const cy = row * (step + s) + step/2 + s/2;
+        drawPoly(ctx, polygon(cx, cy, 8, r, Math.PI/8), light, col);
+        // small square gap
+        const gx = cx + (step + s)/2, gy = cy;
+        if (gx < W + s) {
+          const gh = s / 2;
+          drawPoly(ctx, [[gx-gh,gy-gh],[gx+gh,gy-gh],[gx+gh,gy+gh],[gx-gh,gy+gh]], '#fff', '#aaa');
+        }
+      }
+    }
+    ctx.font = 'bold 13px Segoe UI, Arial';
+    ctx.fillStyle = '#185FA5';
+    ctx.textAlign = 'center';
+    ctx.fillText('Small square gaps appear between octagons', W/2, H - 14);
+  }
+}
+
+function setShape(i) {
+  cur = i;
+  document.querySelectorAll('.shape-row button').forEach((b,j) => b.classList.toggle('active', j===i));
+  const sh = SHAPES[i];
+  drawTessellation(sh);
+
+  const rb = document.getElementById('result-bar');
+  rb.className = 'result-bar ' + (sh.tessellates ? 'tiles' : 'gaps');
+  rb.textContent = (sh.tessellates ? '✓ ' : '✗ ') + sh.msg;
+
+  document.getElementById('angle-val').textContent = sh.angle + '°';
+  if (sh.tessellates) {
+    document.getElementById('vertex-val').textContent = sh.meet + ' × ' + sh.angle + '° = ' + (sh.meet * sh.angle) + '°';
+    document.getElementById('vertex-label').textContent = 'Adds up to exactly 360° — tessellates!';
+    document.getElementById('vertex-label').style.color = '#085041';
+  } else {
+    const close = Math.floor(360 / sh.angle);
+    document.getElementById('vertex-val').textContent = close + ' × ' + sh.angle + '° = ' + (close * sh.angle) + '°';
+    document.getElementById('vertex-label').textContent = 'Does not divide 360° evenly — leaves gaps!';
+    document.getElementById('vertex-label').style.color = '#712B13';
+  }
+  document.getElementById('info-tess').textContent = sh.tessellates
+    ? 'Yes — ' + sh.name + 's tile perfectly with no gaps or overlaps'
+    : 'No — ' + sh.name + 's leave gaps and cannot tile a flat surface alone';
+}
+
+setShape(0);
+</script>
+</body>
+</html>
